@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Police Dashboard – Advanced Alert Zones</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+  <style>
+    :root {
+      --critical: #ff3d00;
+      --high: #ff5722;
+      --medium: #ff9800;
+      --low: #4caf50;
+      --inactive: #607d8b;
+    }
+    
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0e1012;
+      color: #eee;
+    }
+    .sidebar {
+      width: 240px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100%;
+      background: #16181d;
+      padding-top: 20px;
+      border-right: 1px solid #2c2f36;
+      z-index: 999;
+      transition: all 0.3s;
+    }
+    .sidebar ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .sidebar ul li a {
+      display: flex;
+      align-items: center;
+      padding: 14px 20px;
+      color: #ccc;
+      text-decoration: none;
+      transition: 0.3s;
+    }
+    .sidebar ul li a:hover {
+      background: #24262b;
+      color: #fff;
+    }
+    .sidebar ul li a i {
+      margin-right: 12px;
+      font-size: 1.2rem;
+    }
+    .sidebar ul li a.active {
+      background: #00bcd420;
+      color: #00bcd4;
+      border-left: 3px solid #00bcd4;
+    }
+    .topbar {
+      margin-left: 240px;
+      background: #1a1c20;
+      padding: 16px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #2c2f36;
+      transition: all 0.3s;
+    }
+    .topbar h4 {
+      margin: 0;
+      color: #fff;
+      font-weight: 600;
+    }
+    .dashboard {
+      margin-left: 240px;
+      padding: 30px;
+      transition: all 0.3s;
+    }
+    
+    /* Alert Zone Container */
+    .alert-zone-container {
+      display: grid;
+      grid-template-columns: 1fr 1.5fr;
+      gap: 30px;
+      margin-top: 20px;
+    }
+    
+    /* Zone List Section */
+    .zone-list-container {
+      background: #1f2227;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    .zone-list-header {
+      padding: 18px 20px;
+      background: #25282e;
+      border-bottom: 1px solid #2c2f36;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .zone-list-header h5 {
+      margin: 0;
+      color: #fff;
+      font-weight: 600;
+    }
+    .zone-controls {
+      display: flex;
+      gap: 10px;
+    }
+    .zone-search {
+      position: relative;
+    }
+    .zone-search input {
+      background: #1f2227;
+      border: 1px solid #2c2f36;
+      color: #fff;
+      padding: 6px 12px 6px 32px;
+      border-radius: 6px;
+      width: 180px;
+      font-size: 0.85rem;
+    }
+    .zone-search i {
+      position: absolute;
+      left: 10px;
+      top: 8px;
+      color: #666;
+      font-size: 0.9rem;
+    }
+    .zone-filter {
+      background: #1f2227;
+      border: 1px solid #2c2f36;
+      color: #ccc;
+      padding: 0 10px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    
+    /* Zone List Items */
+    .zone-list {
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .zone-item {
+      padding: 16px 20px;
+      border-bottom: 1px solid #2c2f36;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+    .zone-item:hover {
+      background: #25282e;
+    }
+    .zone-item.active {
+      background: #00bcd415;
+    }
+    .zone-item-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .zone-name {
+      font-weight: 600;
+      color: #fff;
+      margin: 0;
+      font-size: 0.95rem;
+    }
+    .zone-priority {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+    .priority-critical { background: var(--critical); }
+    .priority-high { background: var(--high); }
+    .priority-medium { background: var(--medium); }
+    .priority-low { background: var(--low); }
+    .priority-inactive { background: var(--inactive); }
+    
+    .zone-meta {
+      display: flex;
+      gap: 15px;
+      font-size: 0.8rem;
+      color: #aaa;
+    }
+    .zone-meta span {
+      display: flex;
+      align-items: center;
+    }
+    .zone-meta i {
+      margin-right: 5px;
+      font-size: 0.9rem;
+    }
+    .zone-team {
+      display: flex;
+      align-items: center;
+      margin-top: 10px;
+    }
+    .zone-team-avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #00bcd4;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin-right: -8px;
+      border: 2px solid #1f2227;
+    }
+    .zone-team-more {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #2c2f36;
+      color: #aaa;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      margin-left: 5px;
+    }
+    
+    /* Zone Map Section */
+    .zone-map-container {
+      background: #1f2227;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      overflow: hidden;
+    }
+    .zone-map-header {
+      padding: 18px 20px;
+      background: #25282e;
+      border-bottom: 1px solid #2c2f36;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .zone-map-header h5 {
+      margin: 0;
+      color: #fff;
+      font-weight: 600;
+    }
+    .zone-map-tools {
+      display: flex;
+      gap: 10px;
+    }
+    .zone-map-btn {
+      background: #1f2227;
+      border: 1px solid #2c2f36;
+      color: #ccc;
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .zone-map-btn i {
+      font-size: 1rem;
+    }
+    #zone-map {
+      height: 500px;
+      width: 100%;
+    }
+    
+    /* Zone Details Panel */
+    .zone-details {
+      background: #25282e;
+      border-radius: 0 0 12px 12px;
+      padding: 20px;
+      border-top: 1px solid #2c2f36;
+    }
+    .zone-details-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .zone-details-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #fff;
+      margin: 0;
+    }
+    .zone-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-indicator {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    .status-active { background: #4caf50; }
+    .status-warning { background: #ff9800; }
+    .status-critical { background: #f44336; }
+    
+    .zone-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: #1f2227;
+      padding: 12px;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .stat-card h6 {
+      color: #aaa;
+      margin: 0 0 5px;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    .stat-card p {
+      color: #fff;
+      margin: 0;
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+    .stat-card .trend {
+      font-size: 0.7rem;
+      margin-top: 3px;
+    }
+    .trend-up { color: #f44336; }
+    .trend-down { color: #4caf50; }
+    
+    .zone-activity {
+      margin-top: 20px;
+    }
+    .activity-title {
+      font-size: 0.9rem;
+      color: #aaa;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .activity-item {
+      display: flex;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid #2c2f36;
+    }
+    .activity-item:last-child {
+      border-bottom: none;
+    }
+    .activity-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: #00bcd420;
+      color: #00bcd4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .activity-content {
+      flex-grow: 1;
+    }
+    .activity-message {
+      font-size: 0.85rem;
+      color: #fff;
+      margin: 0 0 3px;
+    }
+    .activity-time {
+      font-size: 0.75rem;
+      color: #666;
+    }
+    
+    /* Animations */
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+    
+    /* Responsive */
+    @media (max-width: 1200px) {
+      .alert-zone-container {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="sidebar">
+    <ul>
+      <li><a href="index.html"><i class='bx bx-home'></i> Dashboard</a></li>
+      <li><a href="#"><i class='bx bx-briefcase'></i> Cases</a></li>
+      <li><a href="#"><i class='bx bx-user'></i> Suspects</a></li>
+      <li><a href="patrol.html"><i class='bx bx-map'></i> Patrol</a></li>
+      <li><a href="alet.html" class="active"><i class='bx bx-alarm'></i> Alert Zones</a></li>
+      <li><a href="newcctv.html"><i class='bx bx-cctv'></i> CCTV</a></li>
+      <li><a href="#"><i class='bx bx-analyse'></i> Analytics</a></li>
+      <li><a href="#"><i class='bx bx-envelope'></i> Reports</a></li>
+    </ul>
+  </div>
+
+  <div class="topbar">
+    <h4>Advanced Alert Zone Management</h4>
+    <div style="display: flex; align-items: center; gap: 15px;">
+      <div class="alert-badge animate__animated animate__pulse" style="background: #f44336; color: white; padding: 5px 10px; border-radius: 20px; font-size: 0.8rem;">
+        <i class='bx bx-alarm'></i> 3 Active Alerts
+      </div>
+      <i class='bx bx-bell' style="font-size: 1.4rem; color: #ccc; cursor: pointer;"></i>
+      <i class='bx bx-user-circle' style="font-size: 1.8rem; color: #ccc; cursor: pointer;"></i>
+    </div>
+  </div>
+
+  <div class="dashboard">
+    <div class="alert-zone-container">
+      <!-- Zone List Column -->
+      <div class="zone-list-container">
+        <div class="zone-list-header">
+          <h5>Alert Zones</h5>
+          <div class="zone-controls">
+            <div class="zone-search">
+              <i class='bx bx-search'></i>
+              <input type="text" placeholder="Search zones...">
+            </div>
+            <select class="zone-filter">
+              <option>All Zones</option>
+              <option>Critical</option>
+              <option>High</option>
+              <option>Medium</option>
+              <option>Low</option>
+            </select>
+            <button class="zone-map-btn" id="addZoneBtn">
+              <i class='bx bx-plus'></i> Add
+            </button>
+          </div>
+        </div>
+        
+        <div class="zone-list">
+          <!-- Zone Item 1 (Critical) -->
+          <div class="zone-item active" data-zone-id="1">
+            <div class="zone-item-header">
+              <h6 class="zone-name">Downtown Financial District</h6>
+              <span class="zone-priority priority-critical">CRITICAL</span>
+            </div>
+            <div class="zone-meta">
+              <span><i class='bx bx-map'></i> 500m radius</span>
+              <span><i class='bx bx-time-five'></i> Active 2h 45m</span>
+              <span><i class='bx bx-alarm'></i> 8 alerts</span>
+            </div>
+            <div class="zone-team">
+              <div class="zone-team-avatar" style="background: #00bcd4;">A1</div>
+              <div class="zone-team-avatar" style="background: #ff5722;">B2</div>
+              <div class="zone-team-avatar" style="background: #4caf50;">C3</div>
+              <div class="zone-team-more">+2</div>
+            </div>
+          </div>
+          
+          <!-- Zone Item 2 (High) -->
+          <div class="zone-item" data-zone-id="2">
+            <div class="zone-item-header">
+              <h6 class="zone-name">University Campus Perimeter</h6>
+              <span class="zone-priority priority-high">HIGH</span>
+            </div>
+            <div class="zone-meta">
+              <span><i class='bx bx-map'></i> 300m radius</span>
+              <span><i class='bx bx-time-five'></i> Active 1h 15m</span>
+              <span><i class='bx bx-alarm'></i> 3 alerts</span>
+            </div>
+            <div class="zone-team">
+              <div class="zone-team-avatar" style="background: #9c27b0;">D4</div>
+              <div class="zone-team-avatar" style="background: #ff9800;">E5</div>
+            </div>
+          </div>
+          
+          <!-- Zone Item 3 (Medium) -->
+          <div class="zone-item" data-zone-id="3">
+            <div class="zone-item-header">
+              <h6 class="zone-name">Main Transportation Hub</h6>
+              <span class="zone-priority priority-medium">MEDIUM</span>
+            </div>
+            <div class="zone-meta">
+              <span><i class='bx bx-map'></i> 400m radius</span>
+              <span><i class='bx bx-time-five'></i> Active 45m</span>
+              <span><i class='bx bx-alarm'></i> 1 alert</span>
+            </div>
+            <div class="zone-team">
+              <div class="zone-team-avatar" style="background: #3f51b5;">F6</div>
+              <div class="zone-team-avatar" style="background: #009688;">G7</div>
+              <div class="zone-team-more">+1</div>
+            </div>
+          </div>
+          
+          <!-- Zone Item 4 (Low) -->
+          <div class="zone-item" data-zone-id="4">
+            <div class="zone-item-header">
+              <h6 class="zone-name">Residential Area - North</h6>
+              <span class="zone-priority priority-low">LOW</span>
+            </div>
+            <div class="zone-meta">
+              <span><i class='bx bx-map'></i> 600m radius</span>
+              <span><i class='bx bx-time-five'></i> Monitoring</span>
+              <span><i class='bx bx-alarm'></i> 0 alerts</span>
+            </div>
+            <div class="zone-team">
+              <div class="zone-team-avatar" style="background: #795548;">H8</div>
+            </div>
+          </div>
+          
+          <!-- Zone Item 5 (Inactive) -->
+          <div class="zone-item" data-zone-id="5">
+            <div class="zone-item-header">
+              <h6 class="zone-name">Industrial Zone East</h6>
+              <span class="zone-priority priority-inactive">INACTIVE</span>
+            </div>
+            <div class="zone-meta">
+              <span><i class='bx bx-map'></i> 800m radius</span>
+              <span><i class='bx bx-time-five'></i> Last active 2d ago</span>
+              <span><i class='bx bx-alarm'></i> 0 alerts</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Zone Map Column -->
+      <div class="zone-map-container">
+        <div class="zone-map-header">
+          <h5>Zone Monitoring Map</h5>
+          <div class="zone-map-tools">
+            <button class="zone-map-btn">
+              <i class='bx bx-layer'></i> Layers
+            </button>
+            <button class="zone-map-btn">
+              <i class='bx bx-radar'></i> Heatmap
+            </button>
+            <button class="zone-map-btn">
+              <i class='bx bx-current-location'></i> My Location
+            </button>
+          </div>
+        </div>
+        
+        <div id="zone-map"></div>
+        
+        <div class="zone-details">
+          <div class="zone-details-header">
+            <h5 class="zone-details-title">Downtown Financial District</h5>
+            <div class="zone-status">
+              <div class="status-indicator status-critical"></div>
+              <span style="color: #f44336; font-size: 0.85rem; font-weight: 600;">CRITICAL ALERT</span>
+            </div>
+          </div>
+          
+          <div class="zone-stats">
+            <div class="stat-card">
+              <h6>ACTIVITY LEVEL</h6>
+              <p>87%</p>
+              <div class="trend trend-up"><i class='bx bx-up-arrow-alt'></i> 12% from avg</div>
+            </div>
+            <div class="stat-card">
+              <h6>RESPONSE TIME</h6>
+              <p>4.2m</p>
+              <div class="trend trend-down"><i class='bx bx-down-arrow-alt'></i> 1.3m faster</div>
+            </div>
+            <div class="stat-card">
+              <h6>PATROL UNITS</h6>
+              <p>3</p>
+              <div class="trend">2 nearby</div>
+            </div>
+          </div>
+          
+          <div class="zone-activity">
+            <h6 class="activity-title"><i class='bx bx-time'></i> RECENT ACTIVITY</h6>
+            
+            <div class="activity-item">
+              <div class="activity-icon">
+                <i class='bx bx-alarm'></i>
+              </div>
+              <div class="activity-content">
+                <p class="activity-message">Robbery reported at First National Bank</p>
+                <p class="activity-time">2 minutes ago • Priority 1</p>
+              </div>
+            </div>
+            
+            <div class="activity-item">
+              <div class="activity-icon">
+                <i class='bx bx-user-voice'></i>
+              </div>
+              <div class="activity-content">
+                <p class="activity-message">Officer Rodriguez requested backup</p>
+                <p class="activity-time">12 minutes ago • Unit A1</p>
+              </div>
+            </div>
+            
+            <div class="activity-item">
+              <div class="activity-icon">
+                <i class='bx bx-car'></i>
+              </div>
+              <div class="activity-content">
+                <p class="activity-message">Vehicle pursuit initiated on 5th Ave</p>
+                <p class="activity-time">24 minutes ago • Unit B2</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+  <script>
+    // Initialize the map
+    const zoneMap = L.map('zone-map').setView([24.8607, 67.0011], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(zoneMap);
+
+    // Add critical zone (Downtown Financial District)
+    const downtownZone = L.circle([24.8607, 67.0011], {
+      color: '#ff3d00',
+      fillColor: '#ff3d00',
+      fillOpacity: 0.2,
+      radius: 500
+    }).addTo(zoneMap).bindPopup(`
+      <div style="font-weight:600;margin-bottom:8px;">Downtown Financial District</div>
+      <div style="margin-bottom:5px;"><span style="background:#ff3d00;color:white;padding:2px 6px;border-radius:12px;font-size:0.75rem;">CRITICAL</span></div>
+      <div style="font-size:0.85rem;">
+        <div><i class='bx bx-alarm' style="color:#ff3d00"></i> 8 active alerts</div>
+        <div><i class='bx bx-time' style="color:#ff3d00"></i> 2h 45m active</div>
+        <div><i class='bx bx-group' style="color:#ff3d00"></i> 3 units assigned</div>
+      </div>
+    `);
+
+    // Add high zone (University Campus Perimeter)
+    const universityZone = L.circle([24.8650, 67.0200], {
+      color: '#ff5722',
+      fillColor: '#ff5722',
+      fillOpacity: 0.2,
+      radius: 300
+    }).addTo(zoneMap).bindPopup(`
+      <div style="font-weight:600;margin-bottom:8px;">University Campus Perimeter</div>
+      <div style="margin-bottom:5px;"><span style="background:#ff5722;color:white;padding:2px 6px;border-radius:12px;font-size:0.75rem;">HIGH</span></div>
+      <div style="font-size:0.85rem;">
+        <div><i class='bx bx-alarm' style="color:#ff5722"></i> 3 active alerts</div>
+        <div><i class='bx bx-time' style="color:#ff5722"></i> 1h 15m active</div>
+        <div><i class='bx bx-group' style="color:#ff5722"></i> 2 units assigned</div>
+      </div>
+    `);
+
+    // Add medium zone (Main Transportation Hub)
+    const transportZone = L.circle([24.8500, 66.9900], {
+      color: '#ff9800',
+      fillColor: '#ff9800',
+      fillOpacity: 0.2,
+      radius: 400
+    }).addTo(zoneMap).bindPopup(`
+      <div style="font-weight:600;margin-bottom:8px;">Main Transportation Hub</div>
+      <div style="margin-bottom:5px;"><span style="background:#ff9800;color:white;padding:2px 6px;border-radius:12px;font-size:0.75rem;">MEDIUM</span></div>
+      <div style="font-size:0.85rem;">
+        <div><i class='bx bx-alarm' style="color:#ff9800"></i> 1 active alert</div>
+        <div><i class='bx bx-time' style="color:#ff9800"></i> 45m active</div>
+        <div><i class='bx bx-group' style="color:#ff9800"></i> 2 units assigned</div>
+      </div>
+    `);
+
+    // Add low zone (Residential Area - North)
+    const residentialZone = L.circle([24.8700, 67.0100], {
+      color: '#4caf50',
+      fillColor: '#4caf50',
+      fillOpacity: 0.2,
+      radius: 600
+    }).addTo(zoneMap).bindPopup(`
+      <div style="font-weight:600;margin-bottom:8px;">Residential Area - North</div>
+      <div style="margin-bottom:5px;"><span style="background:#4caf50;color:white;padding:2px 6px;border-radius:12px;font-size:0.75rem;">LOW</span></div>
+      <div style="font-size:0.85rem;">
+        <div><i class='bx bx-alarm' style="color:#4caf50"></i> No active alerts</div>
+        <div><i class='bx bx-time' style="color:#4caf50"></i> Monitoring</div>
+        <div><i class='bx bx-group' style="color:#4caf50"></i> 1 unit assigned</div>
+      </div>
+    `);
+
+    // Add inactive zone (Industrial Zone East)
+    const industrialZone = L.circle([24.8550, 67.0300], {
+      color: '#607d8b',
+      fillColor: '#607d8b',
+      fillOpacity: 0.2,
+      radius: 800
+    }).addTo(zoneMap).bindPopup(`
+      <div style="font-weight:600;margin-bottom:8px;">Industrial Zone East</div>
+      <div style="margin-bottom:5px;"><span style="background:#607d8b;color:white;padding:2px 6px;border-radius:12px;font-size:0.75rem;">INACTIVE</span></div>
+      <div style="font-size:0.85rem;">
+        <div><i class='bx bx-alarm' style="color:#607d8b"></i> No active alerts</div>
+        <div><i class='bx bx-time' style="color:#607d8b"></i> Last active 2d ago</div>
+      </div>
+    `);
+
+    // Add patrol units as markers
+    const unitA1 = L.marker([24.8615, 67.0020], {
+      icon: L.divIcon({
+        className: 'unit-marker',
+        html: '<div style="background:#00bcd4;color:white;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;border:2px solid white;">A1</div>'
+      })
+    }).addTo(zoneMap).bindPopup('Unit A1 - Officer Rodriguez<br>Status: Active');
+
+    const unitB2 = L.marker([24.8590, 66.9995], {
+      icon: L.divIcon({
+        className: 'unit-marker',
+        html: '<div style="background:#ff5722;color:white;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;border:2px solid white;">B2</div>'
+      })
+    }).addTo(zoneMap).bindPopup('Unit B2 - Officer Chen<br>Status: In pursuit');
+
+    const unitC3 = L.marker([24.8620, 67.0035], {
+      icon: L.divIcon({
+        className: 'unit-marker',
+        html: '<div style="background:#4caf50;color:white;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600;border:2px solid white;">C3</div>'
+      })
+    }).addTo(zoneMap).bindPopup('Unit C3 - Officer Williams<br>Status: Patrol');
+
+    // Add incident markers
+    const incident1 = L.marker([24.8605, 67.0015], {
+      icon: L.divIcon({
+        className: 'incident-marker',
+        html: '<div style="background:#f44336;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.2rem;border:2px solid white;"><i class="bx bx-alarm"></i></div>'
+      })
+    }).addTo(zoneMap).bindPopup(`
+      <div style="font-weight:600;margin-bottom:8px;">Bank Robbery</div>
+      <div style="margin-bottom:5px;"><span style="background:#f44336;color:white;padding:2px 6px;border-radius:12px;font-size:0.75rem;">PRIORITY 1</span></div>
+      <div style="font-size:0.85rem;">
+        <div><i class='bx bx-time'></i> Reported 2 min ago</div>
+        <div><i class='bx bx-map'></i> First National Bank</div>
+        <div><i class='bx bx-user'></i> 2 suspects, armed</div>
+      </div>
+    `);
+
+    // Zone selection interaction
+    document.querySelectorAll('.zone-item').forEach(item => {
+      item.addEventListener('click', function() {
+        // Remove active class from all items
+        document.querySelectorAll('.zone-item').forEach(i => {
+          i.classList.remove('active');
+        });
+        
+        // Add active class to clicked item
+        this.classList.add('active');
+        
+        // Get zone ID
+        const zoneId = this.getAttribute('data-zone-id');
+        
+        // In a real app, you would update the map and details based on the zone ID
+        console.log('Selected zone:', zoneId);
+      });
+    });
+
+    // Add zone button
+    document.getElementById('addZoneBtn').addEventListener('click', function() {
+      alert('Add new zone functionality would open a modal in a real application');
+      // In a real app, this would open a modal to create a new zone
+    });
+  </script>
+</body>
+</html>

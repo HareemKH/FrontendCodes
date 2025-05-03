@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Patrol Zones – Police Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.4.1/dist/MarkerCluster.Default.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-color: #00bcd4;
+      --primary-dark: #008ba3;
+      --secondary-color: #0e1012;
+      --sidebar-color: #16181d;
+      --card-bg: #1f2227;
+      --card-hover: #25282e;
+      --border-color: #2c2f36;
+      --text-light: #eee;
+      --text-muted: #888;
+      --accent-red: #ff5252;
+      --accent-orange: #ff9800;
+      --accent-green: #4caf50;
+    }
+
+    body {
+      background: var(--secondary-color);
+      color: var(--text-light);
+      font-family: 'Poppins', sans-serif;
+      margin: 0;
+      min-height: 100vh;
+    }
+
+    .topbar {
+      background: var(--sidebar-color);
+      padding: 15px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+
+    .topbar h4 {
+      margin: 0;
+      font-size: 1.8rem;
+      color: var(--primary-color);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .topbar h4 i {
+      font-size: 1.5rem;
+    }
+
+    .clock {
+      font-size: 1.1rem;
+      color: var(--primary-color);
+      font-weight: 500;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 8px 15px;
+      border-radius: 50px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .zone-section {
+      padding: 30px;
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .search-bar {
+      margin-bottom: 0;
+      max-width: 400px;
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 50px;
+    }
+
+    .search-bar:focus {
+      background: rgba(255, 255, 255, 0.15);
+      color: white;
+      box-shadow: 0 0 0 0.25rem rgba(0, 188, 212, 0.25);
+    }
+
+    .search-bar::placeholder {
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .stats-container {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .stat-card {
+      background: var(--card-bg);
+      padding: 15px 20px;
+      border-radius: 12px;
+      min-width: 150px;
+      text-align: center;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+      border: 1px solid var(--border-color);
+    }
+
+    .stat-card h3 {
+      margin: 0;
+      font-size: 1.8rem;
+      color: var(--primary-color);
+      font-weight: 600;
+    }
+
+    .stat-card p {
+      margin: 5px 0 0;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .zone-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 25px;
+      margin-bottom: 40px;
+    }
+
+    .zone-card {
+      background: var(--card-bg);
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+      transition: all 0.3s ease;
+      cursor: pointer;
+      animation: fadeIn 0.5s ease-out;
+      border-left: 4px solid var(--primary-color);
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+    }
+
+    .zone-card.high-priority {
+      border-left-color: var(--accent-red);
+    }
+
+    .zone-card.medium-priority {
+      border-left-color: var(--accent-orange);
+    }
+
+    .zone-card.low-priority {
+      border-left-color: var(--accent-green);
+    }
+
+    .zone-card:hover {
+      transform: translateY(-5px);
+      background: var(--card-hover);
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+    }
+
+    .zone-card h5 {
+      margin-bottom: 12px;
+      font-size: 1.3rem;
+      color: var(--primary-color);
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .zone-card .priority-badge {
+      font-size: 0.7rem;
+      padding: 4px 10px;
+      border-radius: 50px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .priority-badge.high {
+      background: var(--accent-red);
+    }
+
+    .priority-badge.medium {
+      background: var(--accent-orange);
+      color: #333;
+    }
+
+    .priority-badge.low {
+      background: var(--accent-green);
+    }
+
+    .zone-card p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 15px;
+      line-height: 1.5;
+    }
+
+    .zone-card .unit-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.85rem;
+      margin-bottom: 15px;
+    }
+
+    .zone-card .unit-status i {
+      color: var(--primary-color);
+    }
+
+    .zone-card .zone-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .zone-card .zone-footer span {
+      font-size: 0.85rem;
+      color: var(--primary-color);
+      font-weight: 500;
+      cursor: pointer;
+      transition: color 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .zone-card .zone-footer span:hover {
+      color: var(--primary-dark);
+    }
+
+    .zone-card .zone-footer .last-updated {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    #zone-map {
+      height: 600px;
+      margin-top: 30px;
+      width: 100%;
+      border-radius: 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+    }
+
+    .map-popup {
+      font-size: 1rem;
+      color: #333;
+      font-weight: 500;
+      padding: 10px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.9);
+      min-width: 200px;
+    }
+
+    .map-popup b {
+      color: var(--primary-color);
+    }
+
+    .map-popup .popup-status {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 50px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-top: 5px;
+    }
+
+    .alert-banner {
+      background: linear-gradient(90deg, var(--accent-red), #d32f2f);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 8px;
+      margin-bottom: 25px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: alert-pulse 1.5s infinite alternate;
+    }
+
+    .alert-banner i {
+      font-size: 1.2rem;
+    }
+
+    .map-controls {
+      position: absolute;
+      top: 85px;
+      right: 40px;
+      z-index: 1000;
+      background: rgba(22, 24, 29, 0.9);
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    .map-controls button {
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 5px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.3s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .map-controls button:hover {
+      background: var(--primary-dark);
+    }
+
+    .legend {
+      position: absolute;
+      bottom: 30px;
+      right: 30px;
+      z-index: 1000;
+      background: rgba(22, 24, 29, 0.9);
+      padding: 10px 15px;
+      border-radius: 8px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+      font-size: 0.85rem;
+      border: 1px solid var(--border-color);
+    }
+
+    .legend h4 {
+      margin: 0 0 8px 0;
+      font-size: 0.9rem;
+      color: var(--primary-color);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 5px;
+    }
+
+    .legend-color {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+    }
+
+    .high-priority-color {
+      background: var(--accent-red);
+    }
+
+    .medium-priority-color {
+      background: var(--accent-orange);
+    }
+
+    .low-priority-color {
+      background: var(--accent-green);
+    }
+
+    .zone-details-modal .modal-content {
+      background: var(--card-bg);
+      color: var(--text-light);
+      border-radius: 15px;
+      border: 1px solid var(--border-color);
+    }
+
+    .zone-details-modal .modal-header {
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .zone-details-modal .modal-title {
+      color: var(--primary-color);
+    }
+
+    .zone-details-modal .close {
+      color: var(--text-light);
+      opacity: 0.8;
+    }
+
+    .zone-stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+      margin: 20px 0;
+    }
+
+    .zone-stat {
+      background: rgba(0, 0, 0, 0.2);
+      padding: 15px;
+      border-radius: 10px;
+      border: 1px solid var(--border-color);
+    }
+
+    .zone-stat h5 {
+      margin: 0 0 10px 0;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .zone-stat p {
+      margin: 0;
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: var(--primary-color);
+    }
+
+    .recent-activity {
+      margin-top: 20px;
+    }
+
+    .activity-item {
+      display: flex;
+      gap: 10px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .activity-item:last-child {
+      border-bottom: none;
+    }
+
+    .activity-time {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      min-width: 70px;
+    }
+
+    .activity-desc {
+      font-size: 0.9rem;
+    }
+
+    @keyframes alert-pulse {
+      from {
+        box-shadow: 0 0 0 0 rgba(255, 82, 82, 0.4);
+      }
+      to {
+        box-shadow: 0 0 0 10px rgba(255, 82, 82, 0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 768px) {
+      .zone-section {
+        padding: 20px 15px;
+      }
+      
+      .topbar h4 {
+        font-size: 1.4rem;
+      }
+      
+      .zone-cards {
+        grid-template-columns: 1fr;
+      }
+      
+      .stats-container {
+        justify-content: space-between;
+        width: 100%;
+      }
+      
+      .stat-card {
+        flex: 1;
+        min-width: auto;
+      }
+      
+      .map-controls {
+        top: 75px;
+        right: 20px;
+      }
+      
+      .legend {
+        bottom: 20px;
+        right: 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <h4><i class='bx bx-map-alt'></i> Patrol Zones Overview</h4>
+    <div class="clock" id="clock"><i class='bx bx-time-five'></i> <span id="time"></span> | <span id="date"></span></div>
+  </div>
+
+  <div class="zone-section">
+    <div class="dashboard-header">
+      <input type="text" id="searchInput" class="form-control search-bar" placeholder="Search zones...">
+      <div class="stats-container">
+        <div class="stat-card">
+          <h3 id="totalZones">0</h3>
+          <p>Total Zones</p>
+        </div>
+        <div class="stat-card">
+          <h3 id="activePatrols">0</h3>
+          <p>Active Patrols</p>
+        </div>
+        <div class="stat-card">
+          <h3 id="highPriority">0</h3>
+          <p>High Priority</p>
+        </div>
+        <div class="stat-card">
+          <h3 id="recentIncidents">0</h3>
+          <p>Incidents (24h)</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert-banner">
+      <i class='bx bx-error-circle'></i>
+      <span>High Priority Alert: Korangi - Immediate Surveillance Required! Increased vehicle thefts reported.</span>
+    </div>
+
+    <div class="zone-cards" id="zoneCards">
+      <!-- Cards will be generated dynamically here -->
+    </div>
+
+    <div id="zone-map"></div>
+    <div class="map-controls">
+      <button id="locateBtn"><i class='bx bx-current-location'></i> Locate Me</button>
+      <button id="refreshBtn"><i class='bx bx-refresh'></i> Refresh Data</button>
+    </div>
+    <div class="legend">
+      <h4>Priority Legend</h4>
+      <div class="legend-item">
+        <div class="legend-color high-priority-color"></div>
+        <span>High Priority</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color medium-priority-color"></div>
+        <span>Medium Priority</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color low-priority-color"></div>
+        <span>Low Priority</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zone Details Modal -->
+  <div class="modal fade zone-details-modal" id="zoneDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="zoneModalTitle">Zone Details</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="zoneModalBody">
+          <!-- Content will be loaded dynamically -->
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary">Dispatch Units</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Enhanced clock functionality
+    function updateClock() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString();
+      const dateStr = now.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+      
+      document.getElementById('time').textContent = timeStr;
+      document.getElementById('date').textContent = dateStr;
+    }
+    
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // Initialize map with better defaults
+    const map = L.map('zone-map').setView([24.8607, 67.0011], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    // Add marker cluster group
+    const markers = L.markerClusterGroup();
+    map.addLayer(markers);
+
+    // Enhanced crime data with more details
+    async function fetchCrimeData() {
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      return {
+        "zones": [
+          {
+            "id": 1,
+            "name": "Korangi",
+            "description": "High-priority area with frequent vehicle theft reports. 15 incidents reported in last 24 hours.",
+            "priority": "high",
+            "status": "Active Surveillance",
+            "units": 5,
+            "lat": 24.8333,
+            "lng": 67.1500,
+            "lastUpdated": "2023-06-15T14:30:00",
+            "crimeStats": {
+              "theft": 12,
+              "assault": 3,
+              "burglary": 5,
+              "total": 20
+            },
+            "activity": [
+              {
+                "time": "14:25",
+                "description": "Vehicle theft reported near Korangi Crossing"
+              },
+              {
+                "time": "12:40",
+                "description": "2 patrol units dispatched to investigate suspicious activity"
+              },
+              {
+                "time": "09:15",
+                "description": "Increased patrols after overnight burglaries"
+              }
+            ]
+          },
+          {
+            "id": 2,
+            "name": "Gulshan",
+            "description": "Known for disturbances and public altercations. Requires constant surveillance during evenings.",
+            "priority": "medium",
+            "status": "Routine Patrol",
+            "units": 3,
+            "lat": 24.9235,
+            "lng": 67.0833,
+            "lastUpdated": "2023-06-15T13:45:00",
+            "crimeStats": {
+              "theft": 4,
+              "assault": 8,
+              "burglary": 2,
+              "total": 14
+            },
+            "activity": [
+              {
+                "time": "13:30",
+                "description": "Public disturbance reported near shopping area"
+              },
+              {
+                "time": "11:20",
+                "description": "Patrol unit investigating suspicious package"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "name": "Saddar",
+            "description": "Generally low crime rate. Used for training new recruits and community engagement.",
+            "priority": "low",
+            "status": "Available",
+            "units": 2,
+            "lat": 24.8569,
+            "lng": 67.0099,
+            "lastUpdated": "2023-06-15T10:15:00",
+            "crimeStats": {
+              "theft": 1,
+              "assault": 0,
+              "burglary": 1,
+              "total": 2
+            },
+            "activity": [
+              {
+                "time": "09:45",
+                "description": "Community outreach program in progress"
+              }
+            ]
+          },
+          {
+            "id": 4,
+            "name": "Clifton",
+            "description": "Affluent area with occasional burglary attempts. Increased patrols at night.",
+            "priority": "medium",
+            "status": "Night Patrol",
+            "units": 4,
+            "lat": 24.8167,
+            "lng": 67.0333,
+            "lastUpdated": "2023-06-15T15:10:00",
+            "crimeStats": {
+              "theft": 3,
+              "assault": 1,
+              "burglary": 6,
+              "total": 10
+            },
+            "activity": [
+              {
+                "time": "14:50",
+                "description": "Burglary attempt foiled at seaside residence"
+              },
+              {
+                "time": "10:30",
+                "description": "Security check at diplomatic zone"
+              }
+            ]
+          },
+          {
+            "id": 5,
+            "name": "Lyari",
+            "description": "High-risk zone with gang activity. Requires SWAT team presence and constant monitoring.",
+            "priority": "high",
+            "status": "SWAT Deployment",
+            "units": 8,
+            "lat": 24.8500,
+            "lng": 66.9833,
+            "lastUpdated": "2023-06-15T16:05:00",
+            "crimeStats": {
+              "theft": 8,
+              "assault": 15,
+              "burglary": 7,
+              "total": 30
+            },
+            "activity": [
+              {
+                "time": "15:45",
+                "description": "Gang-related shooting reported"
+              },
+              {
+                "time": "13:15",
+                "description": "SWAT team conducting raid"
+              },
+              {
+                "time": "11:00",
+                "description": "Increased police presence after overnight violence"
+              }
+            ]
+          }
+        ],
+        "stats": {
+          "totalZones": 5,
+          "activePatrols": 4,
+          "highPriority": 2,
+          "recentIncidents": 76
+        }
+      };
+    }
+
+    // Format date/time
+    function formatDateTime(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    // Load zones with enhanced functionality
+    async function loadZones() {
+      try {
+        const crimeData = await fetchCrimeData();
+        const zoneCards = document.getElementById('zoneCards');
+        
+        // Update stats
+        document.getElementById('totalZones').textContent = crimeData.stats.totalZones;
+        document.getElementById('activePatrols').textContent = crimeData.stats.activePatrols;
+        document.getElementById('highPriority').textContent = crimeData.stats.highPriority;
+        document.getElementById('recentIncidents').textContent = crimeData.stats.recentIncidents;
+        
+        // Clear previous content
+        zoneCards.innerHTML = '';
+        markers.clearLayers();
+        
+        // Create cards and markers for each zone
+        crimeData.zones.forEach(zone => {
+          // Create card
+          const card = document.createElement('div');
+          card.classList.add('zone-card', `${zone.priority}-priority`);
+          card.setAttribute('data-zone', zone.name);
+          card.setAttribute('data-id', zone.id);
+          
+          const priorityText = zone.priority === 'high' ? 'High Priority' : 
+                             zone.priority === 'medium' ? 'Medium Priority' : 'Low Priority';
+          
+          card.innerHTML = `
+            <h5>
+              ${zone.name}
+              <span class="priority-badge ${zone.priority}">${priorityText}</span>
+            </h5>
+            <p>${zone.description}</p>
+            <div class="unit-status">
+              <i class='bx bx-group'></i>
+              ${zone.units} Units - ${zone.status}
+            </div>
+            <div class="zone-footer">
+              <span onclick="showZoneDetails(${zone.id})">
+                <i class='bx bx-detail'></i> Details
+              </span>
+              <span class="last-updated">Updated: ${formatDateTime(zone.lastUpdated)}</span>
+            </div>
+          `;
+          zoneCards.appendChild(card);
+          
+          // Create marker with custom icon based on priority
+          let iconColor;
+          if (zone.priority === 'high') iconColor = '#ff5252';
+          else if (zone.priority === 'medium') iconColor = '#ff9800';
+          else iconColor = '#4caf50';
+          
+          const marker = L.marker([zone.lat, zone.lng], {
+            icon: L.divIcon({
+              className: 'custom-marker',
+              html: `<div style="background: ${iconColor}; width: 24px; height: 24px; border-radius: 50%; border: 2px solid white; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">${zone.units}</div>`,
+              iconSize: [24, 24],
+              iconAnchor: [12, 12]
+            })
+          });
+          
+          marker.bindPopup(`
+            <div class="map-popup">
+              <b>${zone.name}</b><br>
+              ${zone.description}<br>
+              <span class="popup-status" style="background: ${iconColor}; color: ${zone.priority === 'medium' ? '#333' : 'white'}">
+                ${priorityText.toUpperCase()}
+              </span>
+            </div>
+          `);
+          
+          marker.on('click', () => {
+            showZoneDetails(zone.id);
+          });
+          
+          markers.addLayer(marker);
+        });
+        
+        // Fit map to show all markers
+        map.fitBounds(markers.getBounds(), { padding: [50, 50] });
+        
+      } catch (error) {
+        console.error('Error loading zone data:', error);
+        alert('Failed to load zone data. Please try again.');
+      }
+    }
+
+    // Show detailed info about a specific zone in modal
+    async function showZoneDetails(zoneId) {
+      const crimeData = await fetchCrimeData();
+      const zone = crimeData.zones.find(z => z.id === zoneId);
+      
+      if (!zone) {
+        alert('Zone details not found');
+        return;
+      }
+      
+      const modalTitle = document.getElementById('zoneModalTitle');
+      const modalBody = document.getElementById('zoneModalBody');
+      
+      modalTitle.textContent = `${zone.name} Zone Details`;
+      
+      modalBody.innerHTML = `
+        <div class="zone-info">
+          <h5>Description</h5>
+          <p>${zone.description}</p>
+          
+          <div class="zone-stats">
+            <div class="zone-stat">
+              <h5>Priority</h5>
+              <p style="color: ${zone.priority === 'high' ? 'var(--accent-red)' : zone.priority === 'medium' ? 'var(--accent-orange)' : 'var(--accent-green)'}">
+                ${zone.priority === 'high' ? 'High' : zone.priority === 'medium' ? 'Medium' : 'Low'}
+              </p>
+            </div>
+            <div class="zone-stat">
+              <h5>Patrol Status</h5>
+              <p>${zone.status}</p>
+            </div>
+            <div class="zone-stat">
+              <h5>Assigned Units</h5>
+              <p>${zone.units}</p>
+            </div>
+            <div class="zone-stat">
+              <h5>Last Updated</h5>
+              <p>${formatDateTime(zone.lastUpdated)}</p>
+            </div>
+          </div>
+          
+          <div class="crime-stats">
+            <h5>Crime Statistics (Last 30 Days)</h5>
+            <div class="zone-stats">
+              <div class="zone-stat">
+                <h5>Theft</h5>
+                <p>${zone.crimeStats.theft}</p>
+              </div>
+              <div class="zone-stat">
+                <h5>Assault</h5>
+                <p>${zone.crimeStats.assault}</p>
+              </div>
+              <div class="zone-stat">
+                <h5>Burglary</h5>
+                <p>${zone.crimeStats.burglary}</p>
+              </div>
+              <div class="zone-stat">
+                <h5>Total Incidents</h5>
+                <p>${zone.crimeStats.total}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div class="recent-activity">
+            <h5>Recent Activity</h5>
+            ${zone.activity.map(act => `
+              <div class="activity-item">
+                <div class="activity-time">${act.time}</div>
+                <div class="activity-desc">${act.description}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+      
+      // Show the modal
+      const modal = new bootstrap.Modal(document.getElementById('zoneDetailsModal'));
+      modal.show();
+      
+      // Pan map to the zone location
+      map.flyTo([zone.lat, zone.lng], 14, {
+        duration: 1
+      });
+    }
+
+    // Search functionality
+    document.getElementById('searchInput').addEventListener('input', function() {
+      const filter = this.value.toLowerCase();
+      document.querySelectorAll('.zone-card').forEach(card => {
+        const zoneName = card.getAttribute('data-zone').toLowerCase();
+        card.style.display = zoneName.includes(filter) ? 'block' : 'none';
+      });
+    });
+
+    // Map controls
+    document.getElementById('locateBtn').addEventListener('click', function() {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(position => {
+          map.flyTo([position.coords.latitude, position.coords.longitude], 15);
+        }, () => {
+          alert('Unable to retrieve your location');
+        });
+      } else {
+        alert('Geolocation is not supported by your browser');
+      }
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', loadZones);
+
+    // Initialize the dashboard
+    document.addEventListener('DOMContentLoaded', loadZones);
+  </script>
+</body>
+
+</html>
